@@ -13,7 +13,7 @@ import {
   getDocs,
 } from "firebase/firestore";
 import { generarReportePorArea, generarReporteConsolidadoGlobal } from "@/lib/exportarReporte";
-import { generarReporteExcelPorArea } from "@/lib/exportarExcel";
+import { generarReporteExcelPorArea, generarListaSeparadoresExcel } from "@/lib/exportarExcel";
 import { LOGO_PUNO_BASE64 } from "@/lib/logoPuno";
 import {
   getAuth,
@@ -139,6 +139,7 @@ export default function Dashboard() {
   const [colapsoListo, setColapsoListo] = useState(false);
   const [exportandoArea, setExportandoArea] = useState(null);
   const [exportandoExcelArea, setExportandoExcelArea] = useState(null);
+  const [exportandoListaArea, setExportandoListaArea] = useState(null);
   const [exportandoGlobal, setExportandoGlobal] = useState(false);
   const [modoPresentacion, setModoPresentacion] = useState(false);
   const [historial, setHistorial] = useState([]);
@@ -230,6 +231,19 @@ export default function Dashboard() {
       alert(`No se pudo generar el Excel: ${err.message}`);
     } finally {
       setExportandoExcelArea(null);
+    }
+  }
+
+  async function handleExportarListaArea(areaNombre, carpetasDelArea) {
+    setExportandoListaArea(areaNombre);
+    try {
+      // La lista de separadores es plana (no refleja avance), así que va con
+      // TODAS las carpetas del área, sin aplicar el filtro de estado.
+      await generarListaSeparadoresExcel(areaNombre, carpetasDelArea);
+    } catch (err) {
+      alert(`No se pudo generar la Lista General: ${err.message}`);
+    } finally {
+      setExportandoListaArea(null);
     }
   }
 
@@ -997,7 +1011,7 @@ export default function Dashboard() {
                     style={{
                       fontSize: 11,
                       padding: "6px 12px",
-                      borderRadius: "0 20px 20px 0",
+                      borderRadius: 0,
                       border: "1.5px solid #457b9d",
                       borderLeft: "none",
                       background: "#141c24",
@@ -1008,6 +1022,24 @@ export default function Dashboard() {
                     title={`Exportar reporte Excel de ${a}`}
                   >
                     📊 {exportandoExcelArea === a ? "Generando..." : "Excel"}
+                  </button>
+                  <button
+                    onClick={() => handleExportarListaArea(a, carpetasPorArea[a] || [])}
+                    disabled={exportandoListaArea === a}
+                    style={{
+                      fontSize: 11,
+                      padding: "6px 12px",
+                      borderRadius: "0 20px 20px 0",
+                      border: "1.5px solid #457b9d",
+                      borderLeft: "none",
+                      background: "#141c24",
+                      color: exportandoListaArea === a ? "#a8dadc" : "#f0d264",
+                      fontWeight: 600,
+                      cursor: exportandoListaArea === a ? "not-allowed" : "pointer",
+                    }}
+                    title={`Exportar Lista General (índice de separadores) de ${a}`}
+                  >
+                    📑 {exportandoListaArea === a ? "Generando..." : "Exportar Lista General"}
                   </button>
                 </div>
               ))}
