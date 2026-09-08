@@ -21,7 +21,7 @@ import {
   signInWithPopup,
   onAuthStateChanged,
 } from "firebase/auth";
-
+A
 const auth = getAuth(db.app);
 
 const COLLAPSE_STORAGE_KEY = "acocollo_i2_grupos_colapsados";
@@ -143,8 +143,6 @@ export default function Page() {
   const [exportandoListaGeneral, setExportandoListaGeneral] = useState(null);
   const [exportandoGlobal, setExportandoGlobal] = useState(false);
   const [modoPresentacion, setModoPresentacion] = useState(false);
-  const [slidePresentacion, setSlidePresentacion] = useState(0);
-  const [carruselPausado, setCarruselPausado] = useState(false);
   const [historial, setHistorial] = useState([]);
   const [actividadPorDia, setActividadPorDia] = useState({});
   const [marcandoId, setMarcandoId] = useState(null);
@@ -375,58 +373,9 @@ export default function Page() {
     };
   }, []);
 
-  const SLIDES_PRESENTACION = ["resumen", "especialidades", "tendencia"];
-
-  // Carrusel automático: solo corre en modo presentación, y se pausa si el
-  // mouse está encima (para que no avance solo mientras alguien lo mira de cerca).
-  useEffect(() => {
-    if (!modoPresentacion || carruselPausado) return;
-    const intervalo = setInterval(() => {
-      setSlidePresentacion((s) => (s + 1) % SLIDES_PRESENTACION.length);
-    }, 15000);
-    return () => clearInterval(intervalo);
-  }, [modoPresentacion, carruselPausado]);
-
-  useEffect(() => {
-    if (!modoPresentacion) setSlidePresentacion(0);
-  }, [modoPresentacion]);
-
-  // Si el usuario sale de pantalla completa con Esc (o el navegador la cierra
-  // solo), que el modo presentación también se apague — para que el botón no
-  // quede diciendo "Salir de presentación" cuando ya no hay nada especial activo.
-  useEffect(() => {
-    function alCambiarFullscreen() {
-      if (!document.fullscreenElement) setModoPresentacion(false);
-    }
-    document.addEventListener("fullscreenchange", alCambiarFullscreen);
-    return () => document.removeEventListener("fullscreenchange", alCambiarFullscreen);
-  }, []);
-
   const pct = resumen && resumen.totalFinales
     ? Math.round((resumen.completas / resumen.totalFinales) * 100)
     : 0;
-
-  // --- Contexto para el modo presentación: cuánto cambió desde la última
-  // sincronización registrada, y a qué fecha se llegaría al 100% si se
-  // mantiene el ritmo de los últimos días. ---
-  const deltaPct =
-    historial.length >= 2 ? pct - historial[historial.length - 2].pct : null;
-
-  const proyeccion = (() => {
-    const DIAS_VENTANA = 14;
-    if (historial.length < 2) return null;
-    const base = historial[Math.max(0, historial.length - 1 - DIAS_VENTANA)];
-    const actual = historial[historial.length - 1];
-    const diasTranscurridos =
-      (new Date(actual.fecha) - new Date(base.fecha)) / (1000 * 60 * 60 * 24);
-    if (diasTranscurridos < 1) return null;
-    const ritmoDiario = (actual.pct - base.pct) / diasTranscurridos;
-    if (ritmoDiario <= 0.05) return { ritmoDiario, fecha: null };
-    const diasRestantes = Math.ceil((100 - actual.pct) / ritmoDiario);
-    const fechaProyectada = new Date(actual.fecha);
-    fechaProyectada.setDate(fechaProyectada.getDate() + diasRestantes);
-    return { ritmoDiario, fecha: fechaProyectada, diasRestantes };
-  })();
 
   const areas = Array.from(new Set(carpetas.map((c) => c.area || "Sin área"))).sort();
 
@@ -869,17 +818,7 @@ export default function Page() {
             </div>
 
             <button
-              onClick={() => {
-                const entrando = !modoPresentacion;
-                setModoPresentacion(entrando);
-                try {
-                  if (entrando && document.documentElement.requestFullscreen) {
-                    document.documentElement.requestFullscreen().catch(() => {});
-                  } else if (!entrando && document.fullscreenElement && document.exitFullscreen) {
-                    document.exitFullscreen().catch(() => {});
-                  }
-                } catch {}
-              }}
+              onClick={() => setModoPresentacion((v) => !v)}
               style={{
                 fontSize: 14,
                 fontWeight: 700,
@@ -935,92 +874,7 @@ export default function Page() {
 
       <div style={{ maxWidth: modoPresentacion ? "100%" : 1500, margin: "0 auto", padding: modoPresentacion ? "24px 48px 36px" : "24px 28px 32px", color: "#F2ECE9" }}>
 
-        {/* Hero de modo presentación: número gigante + contexto (delta y proyección) */}
-        {modoPresentacion && slidePresentacion === 0 && (
-          <div
-            className="acocollo-fade-in"
-            style={{
-              textAlign: "center",
-              marginBottom: 28,
-              padding: "20px 10px 4px",
-            }}
-          >
-            <div style={{ fontSize: 15, fontWeight: 700, color: "#D9C4C8", letterSpacing: 2, textTransform: "uppercase", marginBottom: 4 }}>
-              Avance por archivos
-            </div>
-            <div
-              style={{
-                fontSize: "clamp(72px, 12vw, 140px)",
-                fontWeight: 900,
-                lineHeight: 1,
-                color: "#A83D74",
-                textShadow: "0 0 40px rgba(168,61,116,.65)",
-              }}
-            >
-              {resumen?.pctArchivos ?? "–"}%
-            </div>
-            <div
-              style={{
-                display: "flex",
-                gap: 14,
-                justifyContent: "center",
-                flexWrap: "wrap",
-                marginTop: 14,
-              }}
-            >
-              {deltaPct !== null && (
-                <span
-                  style={{
-                    fontSize: 15,
-                    fontWeight: 700,
-                    padding: "8px 16px",
-                    borderRadius: 20,
-                    background: deltaPct > 0 ? "#2ECC7125" : deltaPct < 0 ? "#c0392b25" : "#16281D",
-                    color: deltaPct > 0 ? "#2ECC71" : deltaPct < 0 ? "#e57373" : "#D9C4C8",
-                    border: `1.5px solid ${deltaPct > 0 ? "#2ECC7166" : deltaPct < 0 ? "#c0392b66" : "#A83D7466"}`,
-                  }}
-                >
-                  {deltaPct > 0 ? "↑" : deltaPct < 0 ? "↓" : "→"} {Math.abs(deltaPct)}% desde la última sincronización
-                </span>
-              )}
-              {proyeccion?.fecha && (
-                <span
-                  style={{
-                    fontSize: 15,
-                    fontWeight: 700,
-                    padding: "8px 16px",
-                    borderRadius: 20,
-                    background: "#16281D",
-                    color: "#F2ECE9",
-                    border: "1.5px solid #D2691E88",
-                  }}
-                >
-                  📅 A este ritmo, termina el{" "}
-                  {proyeccion.fecha.toLocaleDateString("es-PE", { day: "2-digit", month: "long", year: "numeric" })}
-                </span>
-              )}
-              {proyeccion && !proyeccion.fecha && (
-                <span
-                  style={{
-                    fontSize: 15,
-                    fontWeight: 700,
-                    padding: "8px 16px",
-                    borderRadius: 20,
-                    background: "#16281D",
-                    color: "#D9C4C8",
-                    border: "1.5px solid #c0392b66",
-                  }}
-                >
-                  ⚠ Ritmo estancado en los últimos días
-                </span>
-              )}
-            </div>
-          </div>
-        )}
-
         {/* Barra de progreso */}
-        {(!modoPresentacion || slidePresentacion === 0) && (
-        <>
         <div
           style={{
             marginBottom: 20,
@@ -1116,61 +970,8 @@ export default function Page() {
           <Card label="Incompletas" value={resumen?.incompletas ?? "–"} color="#e67e22" grande={modoPresentacion} />
           <Card label="Vacías" value={resumen?.vacias ?? "–"} color="#c0392b" grande={modoPresentacion} />
         </div>
-        </>
-        )}
-
-        {/* Ranking por área — reemplaza los círculos en modo presentación: de
-            un vistazo se ve cuál área va más atrasada, sin comparar círculo
-            por círculo. */}
-        {modoPresentacion && slidePresentacion === 0 && areas.length > 0 && (
-          <div className="acocollo-fade-in" style={{ marginBottom: 32 }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: "#F2ECE9", marginBottom: 16 }}>
-              <span style={{ color: "#A83D74" }}>»» </span>RANKING DE AVANCE POR ÁREA
-            </div>
-            {areas
-              .map((a) => {
-                const stats = areaStats[a] || { total: 0, completas: 0, incompletas: 0, vacias: 0, archivosNecesarios: 0, archivosCompletados: 0 };
-                const pctArea =
-                  stats.archivosNecesarios > 0
-                    ? Math.round((stats.archivosCompletados / stats.archivosNecesarios) * 100)
-                    : 0;
-                return { a, stats, pctArea };
-              })
-              .sort((x, y) => y.pctArea - x.pctArea)
-              .map(({ a, stats, pctArea }, i) => (
-                <div key={a} style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 14 }}>
-                  <div style={{ width: 30, fontSize: 18, fontWeight: 800, color: "#D9C4C8", textAlign: "center", flexShrink: 0 }}>
-                    {i + 1}
-                  </div>
-                  <div style={{ width: 220, fontSize: 16, fontWeight: 700, color: "#F2ECE9", flexShrink: 0 }}>
-                    {a}
-                    <div style={{ fontSize: 12, color: "#D9C4C8", fontWeight: 400 }}>
-                      {stats.total} carpetas · {stats.incompletas} inc. · {stats.vacias} vacías
-                    </div>
-                  </div>
-                  <div style={{ flex: 1, height: 30, background: "#0D1F15", borderRadius: 15, overflow: "hidden", boxShadow: "inset 0 2px 6px rgba(0,0,0,.6)" }}>
-                    <div
-                      style={{
-                        width: `${pctArea}%`,
-                        height: "100%",
-                        background: `linear-gradient(90deg, ${colorForArea(a)}, ${colorForArea(a)}cc)`,
-                        transition: "width .5s ease",
-                        boxShadow: `0 0 16px ${colorForArea(a)}99`,
-                        borderRadius: 15,
-                      }}
-                    />
-                  </div>
-                  <div style={{ width: 64, fontSize: 20, fontWeight: 800, color: colorForArea(a), textAlign: "right", flexShrink: 0 }}>
-                    {pctArea}%
-                  </div>
-                </div>
-              ))}
-          </div>
-        )}
 
         {/* Selector de Rango de Fechas para Actividad/Heatmap */}
-        {(!modoPresentacion || slidePresentacion === 2) && (
-        <>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: "#F2ECE9" }}>
             Visualización de Actividad e Historial
@@ -1206,10 +1007,43 @@ export default function Page() {
           <TendenciaChart historial={historial} grande={modoPresentacion} actividadPorDia={actividadPorDia} />
           <ActividadHeatmap actividadPorDia={actividadPorDia} diasCustom={rangoDiasHeatmap} grande={modoPresentacion} onMarcarCompleta={handleMarcarCompleta} marcandoId={marcandoId} />
         </div>
-        </>
+
+        {modoPresentacion && (
+          <div
+            className="acocollo-fade-in acocollo-modo-transicion"
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+              gap: 28,
+              justifyItems: "center",
+              marginTop: 8,
+            }}
+          >
+            {areas.map((a) => {
+              const stats = areaStats[a] || { total: 0, completas: 0, incompletas: 0, vacias: 0, archivosNecesarios: 0, archivosCompletados: 0 };
+              const pctArea =
+                stats.archivosNecesarios > 0
+                  ? Math.round((stats.archivosCompletados / stats.archivosNecesarios) * 100)
+                  : 0;
+              return (
+                <AreaMiniCard
+                  key={a}
+                  area={a}
+                  pct={pctArea}
+                  total={stats.total}
+                  incompletas={stats.incompletas}
+                  vacias={stats.vacias}
+                  color={colorForArea(a)}
+                  active={false}
+                  onClick={() => {}}
+                  tamano={280}
+                />
+              );
+            })}
+          </div>
         )}
 
-        {modoPresentacion && slidePresentacion === 1 && areas.length > 0 && (
+        {modoPresentacion && areas.length > 0 && (
           <div className="acocollo-fade-in acocollo-modo-transicion" style={{ marginTop: 36 }}>
             <div style={{ fontSize: 16, fontWeight: 700, color: "#F2ECE9", marginBottom: 20, display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ color: "#A83D74" }}>»» </span>AVANCE POR ESPECIALIDAD, POR ÁREA
@@ -1277,78 +1111,6 @@ export default function Page() {
                 </div>
               );
             })}
-          </div>
-        )}
-
-        {modoPresentacion && (
-          <div
-            onMouseEnter={() => setCarruselPausado(true)}
-            onMouseLeave={() => setCarruselPausado(false)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 18,
-              marginTop: 36,
-              padding: "14px 0",
-            }}
-          >
-            <button
-              onClick={() =>
-                setSlidePresentacion((s) => (s - 1 + SLIDES_PRESENTACION.length) % SLIDES_PRESENTACION.length)
-              }
-              style={{
-                fontSize: 20,
-                width: 40,
-                height: 40,
-                borderRadius: "50%",
-                border: "1.5px solid #D2691E88",
-                background: "#16281D",
-                color: "#F2ECE9",
-                cursor: "pointer",
-              }}
-              title="Sección anterior"
-            >
-              ‹
-            </button>
-            <div style={{ display: "flex", gap: 10 }}>
-              {SLIDES_PRESENTACION.map((s, i) => (
-                <button
-                  key={s}
-                  onClick={() => setSlidePresentacion(i)}
-                  title={{ resumen: "Resumen", especialidades: "Por especialidad", tendencia: "Tendencia y actividad" }[s]}
-                  style={{
-                    width: slidePresentacion === i ? 34 : 12,
-                    height: 12,
-                    borderRadius: 6,
-                    border: "none",
-                    background: slidePresentacion === i ? "#A83D74" : "#D9C4C866",
-                    cursor: "pointer",
-                    transition: "all .25s ease",
-                    padding: 0,
-                  }}
-                />
-              ))}
-            </div>
-            <button
-              onClick={() => setSlidePresentacion((s) => (s + 1) % SLIDES_PRESENTACION.length)}
-              style={{
-                fontSize: 20,
-                width: 40,
-                height: 40,
-                borderRadius: "50%",
-                border: "1.5px solid #D2691E88",
-                background: "#16281D",
-                color: "#F2ECE9",
-                cursor: "pointer",
-              }}
-              title="Siguiente sección"
-            >
-              ›
-            </button>
-            {carruselPausado && (
-              <span style={{ fontSize: 11, color: "#D9C4C8", marginLeft: 6 }}>⏸ en pausa</span>
-            )}
           </div>
         )}
 
