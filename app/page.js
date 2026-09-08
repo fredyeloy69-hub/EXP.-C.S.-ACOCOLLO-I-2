@@ -13,7 +13,7 @@ import {
   getDocs,
 } from "firebase/firestore";
 import { generarReportePorArea, generarReporteConsolidadoGlobal } from "../lib/exportarReporte";
-import { generarReporteExcelPorArea, generarListaSeparadoresExcel } from "../lib/exportarExcel";
+import { generarReporteExcelPorArea, generarListaSeparadoresExcel, generarListaGeneralExcel } from "../lib/exportarExcel";
 import { LOGO_PUNO_BASE64 } from "../lib/logoPuno";
 import {
   getAuth,
@@ -137,9 +137,10 @@ export default function Page() {
   const [colapsoListo, setColapsoListo] = useState(false);
   const [exportandoArea, setExportandoArea] = useState(null);
   const [exportandoExcelArea, setExportandoExcelArea] = useState(null);
-  const [exportandoListaArea, setExportandoListaArea] = useState(null);
   const [menuSeparadoresAbierto, setMenuSeparadoresAbierto] = useState(false);
   const [exportandoSeparadores, setExportandoSeparadores] = useState(null);
+  const [menuListaGeneralAbierto, setMenuListaGeneralAbierto] = useState(false);
+  const [exportandoListaGeneral, setExportandoListaGeneral] = useState(null);
   const [exportandoGlobal, setExportandoGlobal] = useState(false);
   const [modoPresentacion, setModoPresentacion] = useState(false);
   const [historial, setHistorial] = useState([]);
@@ -259,22 +260,23 @@ export default function Page() {
     }
   }
 
-  // Mismo Excel de separadores, pero como botón directo por área (junto a
-  // PDF/Excel), en vez del menú desplegable global.
-  async function handleExportarListaArea(areaNombre, carpetasDelArea) {
-    setExportandoListaArea(areaNombre);
+  // Lista general (índice general de la documentación, con columna de
+  // archivadores): igual que separadores, usa TODAS las carpetas del área.
+  async function handleExportarListaGeneral(areaNombre, carpetasDelArea) {
+    setExportandoListaGeneral(areaNombre);
+    setMenuListaGeneralAbierto(false);
     try {
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error("Tiempo de espera agotado al generar el Excel")), 10000)
       );
       await Promise.race([
-        generarListaSeparadoresExcel(areaNombre, carpetasDelArea),
+        generarListaGeneralExcel(areaNombre, carpetasDelArea),
         timeoutPromise,
       ]);
     } catch (err) {
-      alert(`No se pudo generar la Lista General: ${err.message}`);
+      alert(`No se pudo generar la lista general: ${err.message}`);
     } finally {
-      setExportandoListaArea(null);
+      setExportandoListaGeneral(null);
     }
   }
 
@@ -742,6 +744,79 @@ export default function Page() {
               )}
             </div>
 
+            {/* BOTÓN — Índice general de la documentación (azul, distinto al violeta de separadores) */}
+            <div style={{ position: "relative" }}>
+              <button
+                onClick={() => setMenuListaGeneralAbierto((v) => !v)}
+                style={{
+                  fontSize: 13,
+                  fontWeight: 800,
+                  padding: "14px 18px",
+                  borderRadius: 14,
+                  border: "2px solid #3F7FBF",
+                  background: "linear-gradient(135deg,#12263D,#141c24)",
+                  color: "#BFDBFE",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  whiteSpace: "nowrap",
+                  boxShadow: "0 0 16px rgba(63,127,191,.35)",
+                  letterSpacing: 0.2,
+                }}
+                title="Genera el índice general de la documentación, con columna de N° de archivadores para completar a mano"
+              >
+                <span style={{ fontSize: 16 }}>📑</span>
+                EXPORTAR LISTA GENERAL
+                <span style={{ fontSize: 11, opacity: 0.8 }}>{menuListaGeneralAbierto ? "▲" : "▼"}</span>
+              </button>
+
+              {menuListaGeneralAbierto && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "calc(100% + 6px)",
+                    left: 0,
+                    zIndex: 50,
+                    background: "#0E1D2E",
+                    border: "2px solid #3F7FBF",
+                    borderRadius: 12,
+                    minWidth: 260,
+                    boxShadow: "0 8px 24px rgba(0,0,0,.5)",
+                    overflow: "hidden",
+                  }}
+                >
+                  <div style={{ padding: "9px 14px", fontSize: 11, fontWeight: 700, color: "#BFDBFE", borderBottom: "1px solid #3F7FBF55", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                    Elige la carpeta madre
+                  </div>
+                  {areas.map((a) => (
+                    <button
+                      key={a}
+                      onClick={() => handleExportarListaGeneral(a, carpetasPorArea[a] || [])}
+                      disabled={exportandoListaGeneral === a}
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        textAlign: "left",
+                        padding: "11px 14px",
+                        fontSize: 13,
+                        fontWeight: 600,
+                        background: "transparent",
+                        border: "none",
+                        borderBottom: "1px solid #3F7FBF22",
+                        color: exportandoListaGeneral === a ? "#4A6B8A" : "#BFDBFE",
+                        cursor: exportandoListaGeneral === a ? "not-allowed" : "pointer",
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = "#3F7FBF22")}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                    >
+                      📊 {exportandoListaGeneral === a ? `Generando ${a}...` : a}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <button
               onClick={() => setModoPresentacion((v) => !v)}
               style={{
@@ -1127,7 +1202,7 @@ export default function Page() {
                     style={{
                       fontSize: 13,
                       padding: "8px 16px",
-                      borderRadius: 0,
+                      borderRadius: "0 20px 20px 0",
                       border: "1.5px solid #457b9d",
                       borderLeft: "none",
                       background: "#141c24",
@@ -1138,24 +1213,6 @@ export default function Page() {
                     title={`Exportar reporte Excel de ${a}`}
                   >
                     📊 {exportandoExcelArea === a ? "Generando..." : "Excel"}
-                  </button>
-                  <button
-                    onClick={() => handleExportarListaArea(a, carpetasPorArea[a] || [])}
-                    disabled={exportandoListaArea === a}
-                    style={{
-                      fontSize: 13,
-                      padding: "8px 16px",
-                      borderRadius: "0 20px 20px 0",
-                      border: "1.5px solid #457b9d",
-                      borderLeft: "none",
-                      background: "#141c24",
-                      color: exportandoListaArea === a ? "#a8dadc" : "#f0d264",
-                      fontWeight: 600,
-                      cursor: exportandoListaArea === a ? "not-allowed" : "pointer",
-                    }}
-                    title={`Exportar Lista General de ${a}`}
-                  >
-                    📑 {exportandoListaArea === a ? "Generando..." : "Exportar Lista General"}
                   </button>
                 </div>
               ))}
