@@ -400,6 +400,24 @@ export default function Page() {
     return () => document.removeEventListener("fullscreenchange", alCambiarFullscreen);
   }, []);
 
+  // Navegación por teclado en modo presentación: barra espaciadora o flecha
+  // derecha para avanzar, flecha izquierda para retroceder — sin tener que
+  // acercar el cursor a las flechitas.
+  useEffect(() => {
+    if (!modoPresentacion) return;
+    function alPresionarTecla(e) {
+      if (e.code === "Space" || e.code === "ArrowRight") {
+        e.preventDefault();
+        setSlidePresentacion((s) => (s + 1) % SLIDES_PRESENTACION.length);
+      } else if (e.code === "ArrowLeft") {
+        e.preventDefault();
+        setSlidePresentacion((s) => (s - 1 + SLIDES_PRESENTACION.length) % SLIDES_PRESENTACION.length);
+      }
+    }
+    window.addEventListener("keydown", alPresionarTecla);
+    return () => window.removeEventListener("keydown", alPresionarTecla);
+  }, [modoPresentacion]);
+
   const pct = resumen && resumen.totalFinales
     ? Math.round((resumen.completas / resumen.totalFinales) * 100)
     : 0;
@@ -425,6 +443,10 @@ export default function Page() {
     fechaProyectada.setDate(fechaProyectada.getDate() + diasRestantes);
     return { ritmoDiario, fecha: fechaProyectada, diasRestantes };
   })();
+
+  // Hook de conteo animado para el % del hero — debe llamarse siempre, sin
+  // condicionales, aunque el hero solo se muestre en el slide 0.
+  const pctArchivosAnimado = useCountUp(resumen?.pctArchivos ?? 0);
 
   const areas = Array.from(new Set(carpetas.map((c) => c.area || "Sin área"))).sort();
 
@@ -632,6 +654,52 @@ export default function Page() {
         @keyframes acocolloFlotarIn {
           from { opacity: 0; transform: translate(-50%, 20px); }
           to   { opacity: 1; transform: translate(-50%, 0); }
+        }
+        .acocollo-hero-pulso {
+          animation: acocolloHeroPulso 2.6s ease-in-out infinite;
+        }
+        @keyframes acocolloHeroPulso {
+          0%, 100% { text-shadow: 0 0 40px rgba(229,184,11,.65); }
+          50%      { text-shadow: 0 0 70px rgba(229,184,11,1), 0 0 110px rgba(229,184,11,.5); }
+        }
+        .acocollo-anillo-hero {
+          position: absolute;
+          inset: 0;
+          margin: auto;
+          border-radius: 50%;
+          border: 1.5px solid #e5b80b55;
+          animation: acocolloAnilloExpande 3.2s ease-out infinite;
+          pointer-events: none;
+        }
+        @keyframes acocolloAnilloExpande {
+          0%   { width: 60px; height: 60px; opacity: .9; }
+          100% { width: 420px; height: 420px; opacity: 0; }
+        }
+        .acocollo-barra-brillo {
+          position: relative;
+          overflow: hidden;
+        }
+        .acocollo-barra-brillo::after {
+          content: "";
+          position: absolute;
+          top: 0; bottom: 0; left: -60%;
+          width: 45%;
+          background: linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent);
+          animation: acocolloBrilloBarra 2.6s ease-in-out infinite;
+        }
+        @keyframes acocolloBrilloBarra {
+          0%   { left: -60%; }
+          100% { left: 130%; }
+        }
+        .acocollo-ranking-item {
+          animation: acocolloTarjetaEntrada .5s cubic-bezier(.25,.9,.35,1.25) both;
+        }
+        .acocollo-tarjeta-respira {
+          animation: acocolloTarjetaEntrada .5s cubic-bezier(.25,.9,.35,1.25) both, acocolloRespira 3.4s ease-in-out infinite .5s;
+        }
+        @keyframes acocolloRespira {
+          0%, 100% { box-shadow: 0 0 22px var(--glow, rgba(229,184,11,.3)); }
+          50%      { box-shadow: 0 0 40px var(--glow, rgba(229,184,11,.55)); }
         }
       `}</style>
 
@@ -858,7 +926,17 @@ export default function Page() {
         </div>
       </div>
 
-      <div style={{ maxWidth: modoPresentacion ? "100%" : 1500, margin: "0 auto", padding: modoPresentacion ? "24px 48px 36px" : "24px 28px 32px", color: "#ffffff" }}>
+      <div
+        style={{
+          maxWidth: modoPresentacion ? "100%" : 1500,
+          margin: "0 auto",
+          padding: modoPresentacion ? "24px 48px 36px" : "24px 28px 32px",
+          color: "#ffffff",
+          ...(modoPresentacion
+            ? { minHeight: "calc(100vh - 130px)", display: "flex", flexDirection: "column", justifyContent: "center" }
+            : {}),
+        }}
+      >
 
         {/* Hero de modo presentación: número gigante + contexto (delta y proyección) */}
         {modoPresentacion && slidePresentacion === 0 && (
@@ -866,40 +944,45 @@ export default function Page() {
             className="acocollo-fade-in"
             style={{
               textAlign: "center",
-              marginBottom: 28,
-              padding: "20px 10px 4px",
+              marginBottom: 36,
+              padding: "28px 10px 4px",
             }}
           >
-            <div style={{ fontSize: 15, fontWeight: 700, color: "#a8dadc", letterSpacing: 2, textTransform: "uppercase", marginBottom: 4 }}>
+            <div style={{ fontSize: 17, fontWeight: 700, color: "#a8dadc", letterSpacing: 3, textTransform: "uppercase", marginBottom: 6 }}>
               Avance por archivos
             </div>
-            <div
-              style={{
-                fontSize: "clamp(72px, 12vw, 140px)",
-                fontWeight: 900,
-                lineHeight: 1,
-                color: "#e5b80b",
-                textShadow: "0 0 40px rgba(229,184,11,.65)",
-              }}
-            >
-              {resumen?.pctArchivos ?? "–"}%
+            <div style={{ position: "relative", display: "inline-block" }}>
+              <div className="acocollo-anillo-hero" style={{ animationDelay: "0s" }} />
+              <div className="acocollo-anillo-hero" style={{ animationDelay: "1.6s" }} />
+              <div
+                className="acocollo-hero-pulso"
+                style={{
+                  position: "relative",
+                  fontSize: "clamp(90px, 15vw, 190px)",
+                  fontWeight: 900,
+                  lineHeight: 1,
+                  color: "#e5b80b",
+                }}
+              >
+                {pctArchivosAnimado}%
+              </div>
             </div>
             <div
               style={{
                 display: "flex",
-                gap: 14,
+                gap: 16,
                 justifyContent: "center",
                 flexWrap: "wrap",
-                marginTop: 14,
+                marginTop: 20,
               }}
             >
               {deltaPct !== null && (
                 <span
                   style={{
-                    fontSize: 15,
+                    fontSize: 17,
                     fontWeight: 700,
-                    padding: "8px 16px",
-                    borderRadius: 20,
+                    padding: "10px 20px",
+                    borderRadius: 24,
                     background: deltaPct > 0 ? "#2ECC7125" : deltaPct < 0 ? "#c0392b25" : "#141c24",
                     color: deltaPct > 0 ? "#2ECC71" : deltaPct < 0 ? "#e57373" : "#a8dadc",
                     border: `1.5px solid ${deltaPct > 0 ? "#2ECC7166" : deltaPct < 0 ? "#c0392b66" : "#e5b80b66"}`,
@@ -911,10 +994,10 @@ export default function Page() {
               {proyeccion?.fecha && (
                 <span
                   style={{
-                    fontSize: 15,
+                    fontSize: 17,
                     fontWeight: 700,
-                    padding: "8px 16px",
-                    borderRadius: 20,
+                    padding: "10px 20px",
+                    borderRadius: 24,
                     background: "#141c24",
                     color: "#ffffff",
                     border: "1.5px solid #e67e2288",
@@ -927,10 +1010,10 @@ export default function Page() {
               {proyeccion && !proyeccion.fecha && (
                 <span
                   style={{
-                    fontSize: 15,
+                    fontSize: 17,
                     fontWeight: 700,
-                    padding: "8px 16px",
-                    borderRadius: 20,
+                    padding: "10px 20px",
+                    borderRadius: 24,
                     background: "#141c24",
                     color: "#a8dadc",
                     border: "1.5px solid #c0392b66",
@@ -1048,8 +1131,8 @@ export default function Page() {
             un vistazo se ve cuál área va más atrasada, sin comparar círculo
             por círculo. */}
         {modoPresentacion && slidePresentacion === 0 && areas.length > 0 && (
-          <div className="acocollo-fade-in" style={{ marginBottom: 32 }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: "#ffffff", marginBottom: 16 }}>
+          <div className="acocollo-fade-in" style={{ marginBottom: 32, maxWidth: 1100, marginLeft: "auto", marginRight: "auto", width: "100%" }}>
+            <div style={{ fontSize: 19, fontWeight: 700, color: "#ffffff", marginBottom: 22 }}>
               <span style={{ color: "#e5b80b" }}>»» </span>RANKING DE AVANCE POR ÁREA
             </div>
             {areas
@@ -1063,30 +1146,37 @@ export default function Page() {
               })
               .sort((x, y) => y.pctArea - x.pctArea)
               .map(({ a, stats, pctArea }, i) => (
-                <div key={a} style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 14 }}>
-                  <div style={{ width: 30, fontSize: 18, fontWeight: 800, color: "#a8dadc", textAlign: "center", flexShrink: 0 }}>
+                <div
+                  key={a}
+                  className="acocollo-ranking-item"
+                  style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 22, animationDelay: `${i * 90}ms` }}
+                >
+                  <div style={{ width: 34, fontSize: 22, fontWeight: 800, color: "#a8dadc", textAlign: "center", flexShrink: 0 }}>
                     {i + 1}
                   </div>
-                  <div style={{ width: 220, fontSize: 16, fontWeight: 700, color: "#ffffff", flexShrink: 0 }}>
+                  <div style={{ width: 250, fontSize: 19, fontWeight: 700, color: "#ffffff", flexShrink: 0 }}>
                     {a}
-                    <div style={{ fontSize: 12, color: "#a8dadc", fontWeight: 400 }}>
+                    <div style={{ fontSize: 13, color: "#a8dadc", fontWeight: 400 }}>
                       {stats.total} carpetas · {stats.incompletas} inc. · {stats.vacias} vacías
                     </div>
                   </div>
-                  <div style={{ flex: 1, height: 30, background: "#0c1015", borderRadius: 15, overflow: "hidden", boxShadow: "inset 0 2px 6px rgba(0,0,0,.6)" }}>
+                  <div
+                    className="acocollo-barra-brillo"
+                    style={{ flex: 1, height: 48, background: "#0c1015", borderRadius: 24, boxShadow: "inset 0 2px 6px rgba(0,0,0,.6)" }}
+                  >
                     <div
                       style={{
                         width: `${pctArea}%`,
                         height: "100%",
                         background: `linear-gradient(90deg, ${colorForArea(a)}, ${colorForArea(a)}cc)`,
-                        transition: "width .5s ease",
-                        boxShadow: `0 0 16px ${colorForArea(a)}99`,
-                        borderRadius: 15,
+                        transition: "width 1s cubic-bezier(.16,1,.3,1)",
+                        boxShadow: `0 0 20px ${colorForArea(a)}bb`,
+                        borderRadius: 24,
                       }}
                     />
                   </div>
-                  <div style={{ width: 64, fontSize: 20, fontWeight: 800, color: colorForArea(a), textAlign: "right", flexShrink: 0 }}>
-                    {pctArea}%
+                  <div style={{ width: 80, fontSize: 26, fontWeight: 800, color: colorForArea(a), textAlign: "right", flexShrink: 0 }}>
+                    <AnimatedPercent value={pctArea} />
                   </div>
                 </div>
               ))}
@@ -2166,11 +2256,19 @@ function useCountUp(target) {
   return display;
 }
 
+// Envuelve useCountUp en un componente propio para poder usarlo dentro de
+// un .map() (llamar hooks dentro de un loop directamente rompe las reglas
+// de React; como componente aparte, cada instancia tiene su propio hook).
+function AnimatedPercent({ value }) {
+  const animado = useCountUp(value);
+  return <>{animado}%</>;
+}
+
 function Card({ label, value, color, grande }) {
   const valorAnimado = useCountUp(value);
   return (
     <div
-      className="acocollo-tarjeta-viva"
+      className={grande ? "acocollo-tarjeta-viva acocollo-tarjeta-respira" : "acocollo-tarjeta-viva"}
       style={{
         background: "#141c24",
         borderRadius: 12,
@@ -2178,10 +2276,11 @@ function Card({ label, value, color, grande }) {
         border: `1.5px solid ${color}55`,
         borderTop: `4px solid ${color}`,
         boxShadow: `0 0 22px ${color}33`,
+        ...(grande ? { "--glow": `${color}55` } : {}),
       }}
     >
-      <div style={{ fontSize: grande ? 44 : 28, fontWeight: 700, color: "#ffffff", textShadow: `0 0 14px ${color}66` }}>{valorAnimado}</div>
-      <div style={{ fontSize: grande ? 15 : 12, color: "#a8dadc", letterSpacing: 0.3 }}>{label}</div>
+      <div style={{ fontSize: grande ? 52 : 28, fontWeight: 700, color: "#ffffff", textShadow: `0 0 14px ${color}66` }}>{valorAnimado}</div>
+      <div style={{ fontSize: grande ? 16 : 12, color: "#a8dadc", letterSpacing: 0.3 }}>{label}</div>
     </div>
   );
 }
