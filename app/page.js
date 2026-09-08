@@ -21,7 +21,7 @@ import {
   signInWithPopup,
   onAuthStateChanged,
 } from "firebase/auth";
-A
+
 const auth = getAuth(db.app);
 
 const COLLAPSE_STORAGE_KEY = "acocollo_i2_grupos_colapsados";
