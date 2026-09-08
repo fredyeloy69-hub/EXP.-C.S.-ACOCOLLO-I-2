@@ -13,7 +13,7 @@ import {
   getDocs,
 } from "firebase/firestore";
 import { generarReportePorArea, generarReporteConsolidadoGlobal } from "../lib/exportarReporte";
-import { generarReporteExcelPorArea, generarListaSeparadoresExcel, generarListaGeneralExcel } from "../lib/exportarExcel";
+import { generarReporteExcelPorArea, generarListaSeparadoresExcel } from "../lib/exportarExcel";
 import { LOGO_PUNO_BASE64 } from "../lib/logoPuno";
 import {
   getAuth,
@@ -139,8 +139,6 @@ export default function Page() {
   const [exportandoExcelArea, setExportandoExcelArea] = useState(null);
   const [menuSeparadoresAbierto, setMenuSeparadoresAbierto] = useState(false);
   const [exportandoSeparadores, setExportandoSeparadores] = useState(null);
-  const [menuListaGeneralAbierto, setMenuListaGeneralAbierto] = useState(false);
-  const [exportandoListaGeneral, setExportandoListaGeneral] = useState(null);
   const [exportandoGlobal, setExportandoGlobal] = useState(false);
   const [modoPresentacion, setModoPresentacion] = useState(false);
   const [historial, setHistorial] = useState([]);
@@ -257,26 +255,6 @@ export default function Page() {
       alert(`No se pudo generar la lista de separadores: ${err.message}`);
     } finally {
       setExportandoSeparadores(null);
-    }
-  }
-
-  // Lista general (índice general de la documentación, con columna de
-  // archivadores): igual que separadores, usa TODAS las carpetas del área.
-  async function handleExportarListaGeneral(areaNombre, carpetasDelArea) {
-    setExportandoListaGeneral(areaNombre);
-    setMenuListaGeneralAbierto(false);
-    try {
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Tiempo de espera agotado al generar el Excel")), 10000)
-      );
-      await Promise.race([
-        generarListaGeneralExcel(areaNombre, carpetasDelArea),
-        timeoutPromise,
-      ]);
-    } catch (err) {
-      alert(`No se pudo generar la lista general: ${err.message}`);
-    } finally {
-      setExportandoListaGeneral(null);
     }
   }
 
@@ -608,7 +586,7 @@ export default function Page() {
             />
             <div>
               <h1 style={{ fontSize: modoPresentacion ? 36 : 24, marginBottom: 4, fontWeight: 800, letterSpacing: -0.3, color: "#F2ECE9", textShadow: "0 2px 6px rgba(0,0,0,.6)" }}>
-                Expediente Técnico — C.S. ACASO I-2
+                Expediente Técnico — C.S. ACOCOLLO I-2
               </h1>
               <p style={{ color: "#D9C4C8", marginTop: 0, marginBottom: 4, fontSize: modoPresentacion ? 16 : 14 }}>
                 Estado en tiempo real de la carga de documentación
@@ -738,79 +716,6 @@ export default function Page() {
                       onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                     >
                       📊 {exportandoSeparadores === a ? `Generando ${a}...` : a}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* BOTÓN — Índice general de la documentación (azul, distinto al dorado de separadores) */}
-            <div style={{ position: "relative" }}>
-              <button
-                onClick={() => setMenuListaGeneralAbierto((v) => !v)}
-                style={{
-                  fontSize: 13,
-                  fontWeight: 800,
-                  padding: "14px 18px",
-                  borderRadius: 14,
-                  border: "2px solid #3F7FBF",
-                  background: "linear-gradient(135deg,#12263D,#16281D)",
-                  color: "#BFDBFE",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  whiteSpace: "nowrap",
-                  boxShadow: "0 0 16px rgba(63,127,191,.35)",
-                  letterSpacing: 0.2,
-                }}
-                title="Genera el índice general de la documentación, con columna de N° de archivadores para completar a mano"
-              >
-                <span style={{ fontSize: 16 }}>📑</span>
-                EXPORTAR LISTA GENERAL
-                <span style={{ fontSize: 11, opacity: 0.8 }}>{menuListaGeneralAbierto ? "▲" : "▼"}</span>
-              </button>
-
-              {menuListaGeneralAbierto && (
-                <div
-                  style={{
-                    position: "absolute",
-                    top: "calc(100% + 6px)",
-                    left: 0,
-                    zIndex: 50,
-                    background: "#0E1D2E",
-                    border: "2px solid #3F7FBF",
-                    borderRadius: 12,
-                    minWidth: 260,
-                    boxShadow: "0 8px 24px rgba(0,0,0,.5)",
-                    overflow: "hidden",
-                  }}
-                >
-                  <div style={{ padding: "9px 14px", fontSize: 11, fontWeight: 700, color: "#BFDBFE", borderBottom: "1px solid #3F7FBF55", textTransform: "uppercase", letterSpacing: 0.5 }}>
-                    Elige la carpeta madre
-                  </div>
-                  {areas.map((a) => (
-                    <button
-                      key={a}
-                      onClick={() => handleExportarListaGeneral(a, carpetasPorArea[a] || [])}
-                      disabled={exportandoListaGeneral === a}
-                      style={{
-                        display: "block",
-                        width: "100%",
-                        textAlign: "left",
-                        padding: "11px 14px",
-                        fontSize: 13,
-                        fontWeight: 600,
-                        background: "transparent",
-                        border: "none",
-                        borderBottom: "1px solid #3F7FBF22",
-                        color: exportandoListaGeneral === a ? "#4A6B8A" : "#BFDBFE",
-                        cursor: exportandoListaGeneral === a ? "not-allowed" : "pointer",
-                      }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = "#3F7FBF22")}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                    >
-                      📊 {exportandoListaGeneral === a ? `Generando ${a}...` : a}
                     </button>
                   ))}
                 </div>
