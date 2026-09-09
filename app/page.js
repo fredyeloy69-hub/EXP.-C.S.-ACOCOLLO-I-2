@@ -930,10 +930,10 @@ export default function Page() {
         style={{
           maxWidth: modoPresentacion ? "100%" : 1500,
           margin: "0 auto",
-          padding: modoPresentacion ? "24px 48px 36px" : "24px 28px 32px",
+          padding: modoPresentacion ? "6px 48px 20px" : "24px 28px 32px",
           color: "#ffffff",
           ...(modoPresentacion
-            ? { minHeight: "calc(100vh - 130px)", display: "flex", flexDirection: "column", justifyContent: "center" }
+            ? { minHeight: "calc(100vh - 165px)", display: "flex", flexDirection: "column", justifyContent: "center" }
             : {}),
         }}
       >
@@ -945,7 +945,7 @@ export default function Page() {
             style={{
               textAlign: "center",
               marginBottom: 36,
-              padding: "28px 10px 4px",
+              padding: "4px 10px 4px",
             }}
           >
             <div style={{ fontSize: 17, fontWeight: 700, color: "#a8dadc", letterSpacing: 3, textTransform: "uppercase", marginBottom: 6 }}>
@@ -1217,7 +1217,7 @@ export default function Page() {
         </div>
 
         {/* Sección de Tendencia de avance y Actividad */}
-        <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 16, marginBottom: 32 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: modoPresentacion ? 24 : 16, marginBottom: 32, alignItems: "stretch" }}>
           <TendenciaChart historial={historial} grande={modoPresentacion} actividadPorDia={actividadPorDia} />
           <ActividadHeatmap actividadPorDia={actividadPorDia} diasCustom={rangoDiasHeatmap} grande={modoPresentacion} onMarcarCompleta={handleMarcarCompleta} marcandoId={marcandoId} />
         </div>
@@ -1269,8 +1269,8 @@ export default function Page() {
                   <div
                     style={{
                       display: "grid",
-                      gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                      gap: 18,
+                      gridTemplateColumns: `repeat(auto-fit, minmax(${modoPresentacion ? 230 : 200}px, 1fr))`,
+                      gap: modoPresentacion ? 26 : 18,
                     }}
                   >
                     {nombresOrdenados.map((esp, i) => {
@@ -1284,7 +1284,8 @@ export default function Page() {
                           total={s.total}
                           incompletas={s.incompletas}
                           vacias={s.vacias}
-                          delay={i * 30}
+                          delay={i * (modoPresentacion ? 60 : 30)}
+                          grande={modoPresentacion}
                         />
                       );
                     })}
@@ -2042,13 +2043,21 @@ function RutaJerarquica({ ruta, nombre, skipLevels = 0 }) {
   );
 }
 
-function EspecialidadMiniCard({ nombre, pct, total, incompletas = 0, vacias = 0, delay }) {
-  const size = 110;
-  const stroke = 8;
+function EspecialidadMiniCard({ nombre, pct, total, incompletas = 0, vacias = 0, delay, grande }) {
+  const size = grande ? 150 : 110;
+  const stroke = grande ? 11 : 8;
   const radius = (size - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (pct / 100) * circumference;
   const color = pct >= 100 ? "#e5b80b" : pct >= 50 ? "#e67e22" : "#c0392b";
+
+  // El anillo arranca en 0% y se llena hasta su valor real apenas se monta —
+  // para que se note como una animación de progreso, no un número estático.
+  const [avanzado, setAvanzado] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setAvanzado(true), 80 + (delay || 0));
+    return () => clearTimeout(t);
+  }, [delay]);
+  const offset = circumference - ((avanzado ? pct : 0) / 100) * circumference;
 
   return (
     <div
@@ -2057,8 +2066,8 @@ function EspecialidadMiniCard({ nombre, pct, total, incompletas = 0, vacias = 0,
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        gap: 8,
-        padding: "18px 12px",
+        gap: grande ? 12 : 8,
+        padding: grande ? "26px 18px" : "18px 12px",
         borderRadius: 12,
         background: "#141c24",
         border: "1.5px solid #e5b80b66",
@@ -2078,17 +2087,18 @@ function EspecialidadMiniCard({ nombre, pct, total, incompletas = 0, vacias = 0,
           strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={offset}
+          style={{ transition: "stroke-dashoffset 1.1s cubic-bezier(.16,1,.3,1)", filter: `drop-shadow(0 0 6px ${color}aa)` }}
           transform={`rotate(-90 ${size / 2} ${size / 2})`}
         />
-        <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central" fontSize="20" fontWeight="800" fill="#ffffff">
+        <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central" fontSize={grande ? 28 : 20} fontWeight="800" fill="#ffffff">
           {pct}%
         </text>
       </svg>
-      <div style={{ fontSize: 13, fontWeight: 700, color: "#ffffff", textAlign: "center", lineHeight: 1.3, maxWidth: 150 }}>
+      <div style={{ fontSize: grande ? 16 : 13, fontWeight: 700, color: "#ffffff", textAlign: "center", lineHeight: 1.3, maxWidth: grande ? 190 : 150 }}>
         {nombre}
       </div>
-      <div style={{ fontSize: 12, color: "#a8dadc", fontWeight: 700 }}>{total} carpetas</div>
-      <div style={{ fontSize: 13, textAlign: "center", display: "flex", gap: 10, marginTop: 4 }}>
+      <div style={{ fontSize: grande ? 14 : 12, color: "#a8dadc", fontWeight: 700 }}>{total} carpetas</div>
+      <div style={{ fontSize: grande ? 14 : 13, textAlign: "center", display: "flex", gap: 10, marginTop: 4 }}>
         <span style={{ color: "#e67e22", fontWeight: 700 }}>{incompletas} inc.</span>
         <span style={{ color: "#c0392b", fontWeight: 700 }}>{vacias} vacías</span>
       </div>
@@ -2286,14 +2296,14 @@ function Card({ label, value, color, grande }) {
 }
 
 function TendenciaChart({ historial, grande, actividadPorDia }) {
-  const altoLinea = grande ? 420 : 280;
-  const altoBarras = grande ? 100 : 70;
+  const altoLinea = grande ? 540 : 280;
+  const altoBarras = grande ? 130 : 70;
   const alto = altoLinea + altoBarras;
   
-  const anchoPunto = grande ? 65 : 55;
+  const anchoPunto = grande ? 80 : 55;
   const paddingIzq = 60;
   const paddingDer = 40;
-  const anchoMinimo = grande ? 960 : 720;
+  const anchoMinimo = grande ? 1100 : 720;
   const ancho = Math.max(anchoMinimo, paddingIzq + paddingDer + historial.length * anchoPunto);
   const paddingArriba = 24;
 
@@ -2472,8 +2482,8 @@ function ActividadHeatmap({ actividadPorDia, diasCustom = 84, grande }) {
     semanas.push(dias.slice(i, i + 7));
   }
 
-  const celda = grande ? 30 : 17;
-  const gap = grande ? 7 : 4;
+  const celda = grande ? 40 : 17;
+  const gap = grande ? 10 : 4;
   const tiposOrdenados = Object.keys(conteoPorTipoTotal).sort((a, b) => conteoPorTipoTotal[b] - conteoPorTipoTotal[a]);
 
   async function abrirDetalleDia(d) {
