@@ -13,7 +13,7 @@ import {
   getDocs,
 } from "firebase/firestore";
 import { generarReportePorArea, generarReporteConsolidadoGlobal } from "../lib/exportarReporte";
-import { generarReporteExcelPorArea, generarListaSeparadoresExcel } from "../lib/exportarExcel";
+import { generarReporteExcelPorArea, generarListaSeparadoresExcel, generarListaGeneralExcel } from "../lib/exportarExcel";
 import { LOGO_PUNO_BASE64 } from "../lib/logoPuno";
 import {
   getAuth,
@@ -270,7 +270,7 @@ export default function Page() {
         setTimeout(() => reject(new Error("Tiempo de espera agotado al generar el Excel")), 10000)
       );
       await Promise.race([
-        generarListaSeparadoresExcel(areaNombre, carpetasDelArea),
+        generarListaGeneralExcel(areaNombre, carpetasDelArea),
         timeoutPromise,
       ]);
     } catch (err) {
