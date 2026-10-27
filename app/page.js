@@ -12,8 +12,8 @@ import {
   where,
   getDocs,
 } from "firebase/firestore";
-import { generarReportePorArea, generarReporteConsolidadoGlobal } from "../lib/exportarReporte";
-import { generarReporteExcelPorArea, generarListaSeparadoresExcel, generarListaGeneralExcel } from "../lib/exportarExcel";
+import { generarReportePorArea, generarReporteConsolidadoGlobal, generarReporteActividadDiaPDF } from "../lib/exportarReporte";
+import { generarReporteExcelPorArea, generarListaSeparadoresExcel } from "../lib/exportarExcel";
 import { LOGO_PUNO_BASE64 } from "../lib/logoPuno";
 import {
   getAuth,
@@ -270,7 +270,7 @@ export default function Page() {
         setTimeout(() => reject(new Error("Tiempo de espera agotado al generar el Excel")), 10000)
       );
       await Promise.race([
-        generarListaGeneralExcel(areaNombre, carpetasDelArea),
+        generarListaSeparadoresExcel(areaNombre, carpetasDelArea),
         timeoutPromise,
       ]);
     } catch (err) {
@@ -2432,6 +2432,7 @@ function ActividadHeatmap({ actividadPorDia, diasCustom = 84, grande }) {
   const tooltipRef = useRef(null);
   const [diaSeleccionado, setDiaSeleccionado] = useState(null);
   const [eventosDelDia, setEventosDelDia] = useState(null);
+  const [exportandoPdfDia, setExportandoPdfDia] = useState(false);
 
   useEffect(() => {
     if (!tooltip) {
@@ -2503,6 +2504,20 @@ function ActividadHeatmap({ actividadPorDia, diasCustom = 84, grande }) {
     } catch {
       setEventosDelDia([]);
     }
+  }
+
+  function exportarPdfDia() {
+    if (!diaSeleccionado || !eventosDelDia || eventosDelDia.length === 0) return;
+    setExportandoPdfDia(true);
+    setTimeout(() => {
+      try {
+        generarReporteActividadDiaPDF(formatearFechaLarga(diaSeleccionado.fecha), diaSeleccionado.key, eventosDelDia, {});
+      } catch (err) {
+        alert(`No se pudo generar el PDF: ${err.message}`);
+      } finally {
+        setExportandoPdfDia(false);
+      }
+    }, 60);
   }
 
   function mostrarTooltip(e, texto) {
@@ -2657,6 +2672,24 @@ function ActividadHeatmap({ actividadPorDia, diasCustom = 84, grande }) {
                   {diaSeleccionado.count} evento{diaSeleccionado.count !== 1 ? "s" : ""} registrado{diaSeleccionado.count !== 1 ? "s" : ""}
                 </div>
               </div>
+              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                <button
+                  onClick={exportarPdfDia}
+                  disabled={exportandoPdfDia || !eventosDelDia || eventosDelDia.length === 0}
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 700,
+                    padding: "7px 14px",
+                    borderRadius: 8,
+                    border: "1.5px solid #e5b80b",
+                    background: "#e5b80b33",
+                    color: "#ffffff",
+                    cursor: exportandoPdfDia || !eventosDelDia || eventosDelDia.length === 0 ? "not-allowed" : "pointer",
+                    opacity: !eventosDelDia || eventosDelDia.length === 0 ? 0.5 : 1,
+                  }}
+                >
+                  {exportandoPdfDia ? "Generando PDF..." : "📄 Exportar PDF"}
+                </button>
               <button
                 onClick={() => setDiaSeleccionado(null)}
                 style={{
@@ -2671,6 +2704,7 @@ function ActividadHeatmap({ actividadPorDia, diasCustom = 84, grande }) {
               >
                 ✕ Cerrar
               </button>
+              </div>
             </div>
             <div style={{ overflowY: "auto", padding: "16px 26px 26px", flex: 1 }}>
               {eventosDelDia === null ? (
