@@ -60,6 +60,8 @@ const EVENTO_LABEL = {
   archivo_subido: "subió",
   archivo_reemplazado: "reemplazó",
   archivo_borrado: "borró",
+  archivo_movido: "movió",
+  archivo_copiado: "copió",
   carpeta_creada: "creó la carpeta",
   carpeta_borrada: "borró la carpeta",
   carpeta_movida: "movió la carpeta",
@@ -72,6 +74,8 @@ const EVENTO_COLOR = {
   archivo_subido: "#e5b80b",
   archivo_reemplazado: "#e67e22",
   archivo_borrado: "#c0392b",
+  archivo_movido: "#9b7be0",
+  archivo_copiado: "#2bb5a0",
   carpeta_creada: "#457b9d",
   carpeta_borrada: "#c0392b",
   carpeta_movida: "#e67e22",
@@ -84,6 +88,8 @@ const EVENTO_ICONO = {
   archivo_subido: "↑",
   archivo_reemplazado: "⟲",
   archivo_borrado: "✕",
+  archivo_movido: "⇄",
+  archivo_copiado: "⧉",
   carpeta_creada: "+",
   carpeta_borrada: "✕",
   carpeta_movida: "⇄",
@@ -1798,10 +1804,16 @@ export default function Page() {
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 13, color: "#ffffff" }}>
-                        <strong>{e.usuario}</strong> <span style={{ color }}>{EVENTO_LABEL[e.tipo] || e.tipo}</span> <strong>{e.item}</strong>
+                        <strong>{e.usuario}</strong>{e.ultimoModificador && /^(No identificado|Desconocido)/.test(e.usuario || "") ? <span style={{ fontSize: 11, color: "#a8dadc" }}> (última modificación en Drive: {e.ultimoModificador})</span> : null} <span style={{ color }}>{EVENTO_LABEL[e.tipo] || e.tipo}</span> <strong>{e.item}</strong>
                       </div>
+                      {(e.tipo === "archivo_movido" || e.tipo === "archivo_copiado" || e.tipo === "carpeta_movida") && (e.desde || e.ruta) && (
+                        <div style={{ fontSize: 10.5, color: "#a8dadc", marginTop: 3, wordBreak: "break-all" }}>
+                          {e.desde ? <div>Desde: {e.desde}</div> : null}
+                          {e.ruta ? <div>Hacia: {e.ruta}</div> : null}
+                        </div>
+                      )}
                       <div style={{ fontSize: 10, color: "#a8dadc", marginTop: 2 }}>
-                        {tiempoRelativo(fecha)}
+                        {fecha ? `${fecha.toLocaleString("es-PE", { timeZone: "America/Lima", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true })} · ` : ""}{tiempoRelativo(fecha)}
                       </div>
                     </div>
                   </div>
@@ -2433,6 +2445,7 @@ function ActividadHeatmap({ actividadPorDia, diasCustom = 84, grande }) {
   const [diaSeleccionado, setDiaSeleccionado] = useState(null);
   const [eventosDelDia, setEventosDelDia] = useState(null);
   const [exportandoPdfDia, setExportandoPdfDia] = useState(false);
+  const [rangoHoras, setRangoHoras] = useState(0); // 0 = todo el día; 3 o 5 = solo las últimas N horas (solo hoy)
 
   useEffect(() => {
     if (!tooltip) {
@@ -2490,6 +2503,7 @@ function ActividadHeatmap({ actividadPorDia, diasCustom = 84, grande }) {
   async function abrirDetalleDia(d) {
     setDiaSeleccionado(d);
     setEventosDelDia(null);
+    setRangoHoras(0);
     try {
       const inicioUTC = new Date(`${d.key}T05:00:00.000Z`);
       const finUTC = new Date(inicioUTC.getTime() + 24 * 60 * 60 * 1000);
@@ -2508,10 +2522,24 @@ function ActividadHeatmap({ actividadPorDia, diasCustom = 84, grande }) {
 
   function exportarPdfDia() {
     if (!diaSeleccionado || !eventosDelDia || eventosDelDia.length === 0) return;
+    // Rango opcional: solo las últimas 3 o 5 horas (solo aplica al día de hoy)
+    const esHoyDia = diaSeleccionado.key === fechaLimaISO(new Date());
+    const horas = esHoyDia ? rangoHoras : 0;
+    const desde = horas > 0 ? Date.now() - horas * 60 * 60 * 1000 : 0;
+    const lista = horas > 0
+      ? eventosDelDia.filter((ev) => ev.timestamp?.toDate && ev.timestamp.toDate().getTime() >= desde)
+      : eventosDelDia;
+    if (lista.length === 0) {
+      alert(`No hay actividad en las últimas ${horas} horas.`);
+      return;
+    }
+    const tituloFecha = horas > 0
+      ? `${formatearFechaLarga(diaSeleccionado.fecha)} — últimas ${horas} horas`
+      : formatearFechaLarga(diaSeleccionado.fecha);
     setExportandoPdfDia(true);
     setTimeout(() => {
       try {
-        generarReporteActividadDiaPDF(formatearFechaLarga(diaSeleccionado.fecha), diaSeleccionado.key, eventosDelDia, {});
+        generarReporteActividadDiaPDF(tituloFecha, horas > 0 ? `${diaSeleccionado.key}_ultimas_${horas}h` : diaSeleccionado.key, lista, {});
       } catch (err) {
         alert(`No se pudo generar el PDF: ${err.message}`);
       } finally {
@@ -2673,6 +2701,26 @@ function ActividadHeatmap({ actividadPorDia, diasCustom = 84, grande }) {
                 </div>
               </div>
               <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                {diaSeleccionado.key === fechaLimaISO(new Date()) && (
+                  <select
+                    value={rangoHoras}
+                    onChange={(e) => setRangoHoras(Number(e.target.value))}
+                    style={{
+                      fontSize: 13,
+                      padding: "7px 10px",
+                      borderRadius: 8,
+                      border: "1.5px solid #e5b80b",
+                      background: "#0c1015",
+                      color: "#ffffff",
+                      cursor: "pointer",
+                    }}
+                    title="Rango de horas que se exporta en el PDF"
+                  >
+                    <option value={0}>Todo el día</option>
+                    <option value={3}>Últimas 3 horas</option>
+                    <option value={5}>Últimas 5 horas</option>
+                  </select>
+                )}
                 <button
                   onClick={exportarPdfDia}
                   disabled={exportandoPdfDia || !eventosDelDia || eventosDelDia.length === 0}
@@ -2690,20 +2738,20 @@ function ActividadHeatmap({ actividadPorDia, diasCustom = 84, grande }) {
                 >
                   {exportandoPdfDia ? "Generando PDF..." : "📄 Exportar PDF"}
                 </button>
-              <button
-                onClick={() => setDiaSeleccionado(null)}
-                style={{
-                  fontSize: 14,
-                  padding: "7px 14px",
-                  borderRadius: 8,
-                  border: "1.5px solid #457b9d",
-                  background: "transparent",
-                  color: "#a8dadc",
-                  cursor: "pointer",
-                }}
-              >
-                ✕ Cerrar
-              </button>
+                <button
+                  onClick={() => setDiaSeleccionado(null)}
+                  style={{
+                    fontSize: 14,
+                    padding: "7px 14px",
+                    borderRadius: 8,
+                    border: "1.5px solid #457b9d",
+                    background: "transparent",
+                    color: "#a8dadc",
+                    cursor: "pointer",
+                  }}
+                >
+                  ✕ Cerrar
+                </button>
               </div>
             </div>
             <div style={{ overflowY: "auto", padding: "16px 26px 26px", flex: 1 }}>
@@ -2755,8 +2803,13 @@ function ActividadHeatmap({ actividadPorDia, diasCustom = 84, grande }) {
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 14, color: "#ffffff" }}>
-                            <strong>{ev.usuario || "Usuario"}</strong> <span style={{ color }}>{EVENTO_LABEL[ev.tipo] || ev.tipo}</span> <strong style={{ color: "#e5b80b" }}>{ev.item}</strong>
+                            <strong>{ev.usuario || "Usuario"}</strong>{ev.ultimoModificador && /^(No identificado|Desconocido)/.test(ev.usuario || "") ? <span style={{ fontSize: 12, color: "#a8dadc" }}> (última modificación en Drive: {ev.ultimoModificador})</span> : null} <span style={{ color }}>{EVENTO_LABEL[ev.tipo] || ev.tipo}</span> <strong style={{ color: "#e5b80b" }}>{ev.item}</strong>
                           </div>
+                          {ev.desde && (
+                            <div style={{ fontSize: 12, color: "#a8dadc", marginTop: 3, wordBreak: "break-all" }}>
+                              Desde: {ev.desde}
+                            </div>
+                          )}
                           {ev.ruta && (
                             <div style={{ fontSize: 12, color: "#a8dadc", marginTop: 3, wordBreak: "break-all" }}>
                               📁 {ev.ruta}
